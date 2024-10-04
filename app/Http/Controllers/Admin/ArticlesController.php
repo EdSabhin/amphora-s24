@@ -20,7 +20,7 @@ use Illuminate\Http\Response;
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
-use Supabase\Storage\StorageClient;
+use Illuminate\Support\Facades\Log;
 
 class ArticlesController extends Controller
 {
@@ -82,8 +82,11 @@ class ArticlesController extends Controller
     $sanitized = $request->getSanitized();
 
     // Upload image to Supabase if it exists
+    $imageUrl = null;
+    Log::info('$request: ', ['$request' => $request->file('image')]);
     if ($request->hasFile('image')) {
       $imageUrl = $supabaseService->uploadImage($request->file('image'));
+      Log::info('imageeee: ', ['image' => $imageUrl]);
     }
 
     if ($imageUrl) {
