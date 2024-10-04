@@ -9,6 +9,7 @@ use App\Http\Requests\Admin\Article\IndexArticle;
 use App\Http\Requests\Admin\Article\StoreArticle;
 use App\Http\Requests\Admin\Article\UpdateArticle;
 use App\Models\Article;
+use App\Services\SupabaseService;
 use Brackets\AdminListing\Facades\AdminListing;
 use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -75,51 +76,28 @@ class ArticlesController extends Controller
    * @param StoreArticle $request
    * @return array|RedirectResponse|Redirector
    */
-  public function store(StoreArticle $request)
+  public function store(StoreArticle $request, SupabaseService $supabaseService)
   {
-      // Sanitize input
-      $sanitized = $request->getSanitized();
-  
-      // Upload image to Supabase if it exists
-      if ($request->hasFile('image')) {
-          $image = $request->file('image');
-          $imagePathname = $image->getPathname();
-          $imageName = time() . "-" . $image->getClientOriginalName();
-  
-          
-          // Upload image to Supabase bucket
-          $supabaseStorage = new StorageClient(env('SUPABASE_URL'), env('SUPABASE_KEY'));
-          $supabaseBucket = $supabaseStorage->from(env('SUPABASE_BUCKET'));
-  
-          // Try to upload the image and catch any errors
-          try {
-              $response = $supabaseBucket->upload(
-                  $imageName,
-                  file_get_contents($imagePathname),
-                  [
-                      'contentType' => $image->getClientMimeType()
-                  ]
-              );
-  
-              // Check if the upload was successful
-              if (isset($response['error'])) {
-                  return back()->withErrors(['image' => 'Error uploading image to Supabase: ' . $response['error']['message']]);
-              }
-  
-              // Save the URL of the uploaded image
-              $sanitized['image'] = env('SUPABASE_URL') . '/storage/v1/object/public/' . env('SUPABASE_BUCKET') . '/' . $imageName;
-          } catch (Exception $e) {
-              return back()->withErrors(['image' => 'Exception occurred: ' . $e->getMessage()]);
-          }
-      }
-      // Store the Article with the image URL
-      $article = Article::create($sanitized);
-  
-      if ($request->ajax()) {
-          return ['redirect' => url('admin/articles'), 'message' => trans('brackets/admin-ui::admin.operation.succeeded')];
-      }
-  
-      return redirect('admin/articles');
+    // Sanitize input
+    $sanitized = $request->getSanitized();
+
+    // Upload image to Supabase if it exists
+    if ($request->hasFile('image')) {
+      $imageUrl = $supabaseService->uploadImage($request->file('image'));
+    }
+
+    if ($imageUrl) {
+      $sanitized['image'] = $imageUrl;
+    }
+
+    // Store the Article with the image URL
+    $article = Article::create($sanitized);
+
+    if ($request->ajax()) {
+      return ['redirect' => url('admin/articles'), 'message' => trans('brackets/admin-ui::admin.operation.succeeded')];
+    }
+
+    return redirect('admin/articles');
   }
 
 
